@@ -46,10 +46,19 @@ p{margin:0 0 14px;opacity:.8}
 <script>
 const $=id=>document.getElementById(id),V=(x,y,z)=>new THREE.Vector3(x,y,z),C=h=>new THREE.Color(h);
 const sv=(k,v)=>{try{localStorage.setItem('cr_'+k,v)}catch(e){}},ld=k=>{try{return localStorage.getItem('cr_'+k)}catch(e){return null}};
+const FD=kind=>s=>{FF(s);
+ s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWp;').replace('#include <begin_vertex>','#include <begin_vertex>\nvWp=(modelMatrix*vec4(transformed,1.)).xyz;');
+ const GD='vec2 q=vWp.xz;float g1=fb5(q*.3),g2=fb5(q*1.3+9.),g3=hs2(floor(q*5.));diffuseColor.rgb*=.72+.5*g1+.22*(g2-.5)+.12*(g3-.5);';
+ const RD='float cu=vWp.x-(sin(vWp.z*.011)*34.+sin(vWp.z*.027+1.)*11.);float tr=exp(-pow((abs(cu)-1.5)/.55,2.));vec2 q=vWp.xz;float a1=fb5(q*.8),a2=hs2(floor(q*12.));diffuseColor.rgb*=(.8+.3*a1+.16*(a2-.5))*(1.-.14*tr);';
+ s.fragmentShader=s.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vWp;\n'+CLG).replace('#include <color_fragment>','#include <color_fragment>\n'+(kind=='g'?GD:RD))};
+const WT={value:0};
+const FW=s=>{FF(s);s.uniforms.uWT=WT;s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nuniform float uWT;').replace('#include <begin_vertex>','#include <begin_vertex>\n#ifdef USE_INSTANCING\nvec3 ip=instanceMatrix[3].xyz;\n#else\nvec3 ip=vec3(0.);\n#endif\ntransformed.x+=sin(uWT*1.3+ip.x*.21+ip.z*.17)*.045*(position.y+1.2);transformed.z+=cos(uWT*1.1+ip.z*.19)*.03*(position.y+1.2);')};
 const FF=s=>{s.fragmentShader=s.fragmentShader.replace('#include <fog_fragment>',`#ifdef USE_FOG
 float ff=1.-exp(-fogDensity*fogDensity*fogDepth*fogDepth);ff=max(ff,smoothstep(220.,400.,fogDepth));gl_FragColor.rgb=mix(gl_FragColor.rgb,fogColor,ff);
 #endif`)};
 const M=(c,o)=>{const m=new THREE.MeshLambertMaterial(Object.assign({color:c,flatShading:true},o));m.onBeforeCompile=FF;return m};
+const MD=(c,o,k)=>{const m=new THREE.MeshLambertMaterial(Object.assign({color:c,flatShading:true},o));m.onBeforeCompile=FD(k);m.customProgramCacheKey=()=>'fd'+k;return m};
+const MW=()=>{const m=new THREE.MeshLambertMaterial({color:0xffffff});m.onBeforeCompile=FW;m.customProgramCacheKey=()=>'fw';return m};
 const sm=(a,b,x)=>{x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x)};
 const hs=(x,z)=>{const s=Math.sin(x*127.1+z*311.7)*43758.5453;return s-Math.floor(s)};
 function vn(x,z){const i=Math.floor(x),j=Math.floor(z),fx=x-i,fz=z-j,u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);return(hs(i,j)*(1-u)+hs(i+1,j)*u)*(1-v)+(hs(i,j+1)*(1-u)+hs(i+1,j+1)*u)*v}
@@ -61,29 +70,30 @@ const shoreU=z=>{const r=RZ(z)-.12,t=(r+1.8)/(r+9),e=6+OFF(z),w=28-22*CF(z);retu
 function H(x,z){const u=x-CX(z),r=RZ(z)-.12;if(u>0){const e=6+OFF(z),t=sm(e,e+28-22*CF(z),u);return r*(1-t)-9*t}const t=sm(7,60,-u);return r*(1-t)+t*(RZ(z)+18*fbm(x*.012,z*.012)+3+vn(x*.06,z*.06)*2)}
 
 /* renderer */
-const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));document.body.appendChild(ren.domElement);
+const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(ren.domElement);
 const scn=new THREE.Scene();scn.fog=new THREE.FogExp2(0xcfe6f3,.008);
 const cam=new THREE.PerspectiveCamera(58,1,.1,1500);
 const rsz=()=>{ren.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',rsz);rsz();
 const hemi=new THREE.HemisphereLight(0xffffff,0x56624a,.7),sunL=new THREE.DirectionalLight(0xffffff,1),lamp=new THREE.PointLight(0xffe6b0,0,26);
-const fill=new THREE.DirectionalLight(0xffffff,.3);fill.position.set(.3,.7,1);scn.add(hemi,sunL,sunL.target,fill);
-const skyM=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{t:{value:C(0)},h:{value:C(0)},sc:{value:C(0)},sd:{value:V(0,1,0)},k:{value:1},w:{value:0}},
+const fill=new THREE.DirectionalLight(0xffffff,.3);fill.position.set(.3,.7,1);const shL=new THREE.DirectionalLight(0xffffff,.001);shL.castShadow=true;shL.shadow.mapSize.set(2048,2048);Object.assign(shL.shadow.camera,{left:-48,right:48,top:48,bottom:-48,near:1,far:420});shL.shadow.bias=-.0008;shL.shadow.normalBias=.06;scn.add(hemi,sunL,sunL.target,fill,shL,shL.target);
+const CLG='float hs2(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float vn2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hs2(i),hs2(i+vec2(1.,0.)),f.x),mix(hs2(i+vec2(0.,1.)),hs2(i+vec2(1.,1.)),f.x),f.y);}float fb5(vec2 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*vn2(p);p=p*2.03+17.;a*=.5;}return s;}float cloudD(vec3 d,float t,float cv){vec2 p=d.xz/(d.y+.15)*1.1+vec2(t*.02,t*.012);float n=fb5(p);return smoothstep(1.-cv,1.-cv+.3,n)*smoothstep(0.,.12,d.y);}';
+const skyM=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{t:{value:C(0)},h:{value:C(0)},sc:{value:C(0)},sd:{value:V(0,1,0)},k:{value:1},w:{value:0},cc:{value:C(0xffffff)},cv:{value:.4},tt:{value:0}},
 vertexShader:'varying vec3 d;void main(){d=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-fragmentShader:'uniform vec3 t,h,sc,sd;uniform float k,w;varying vec3 d;void main(){vec3 c=mix(h,t,pow(smoothstep(0.,.7,d.y),.7));c+=vec3(.2,.02,.1)*w*smoothstep(0.,.2,d.y)*(1.-smoothstep(.2,.65,d.y));float g=max(dot(d,sd),0.);c+=sc*k*(pow(g,64.)*.35+pow(g,12.)*.28+pow(g,3.)*.1);gl_FragColor=vec4(c,1.);}'});
+fragmentShader:'uniform vec3 t,h,sc,sd,cc;uniform float k,w,cv,tt;varying vec3 d;'+CLG+'void main(){vec3 c=mix(h,t,pow(smoothstep(0.,.7,d.y),.7));c+=vec3(.2,.02,.1)*w*smoothstep(0.,.2,d.y)*(1.-smoothstep(.2,.65,d.y));float g=max(dot(d,sd),0.);c+=sc*k*(pow(g,64.)*.35+pow(g,12.)*.28+pow(g,3.)*.1);float cl=cloudD(d,tt,cv);if(cl>0.){float ds=cloudD(normalize(d+sd*.04),tt,cv);float lf=clamp(1.-(ds-cl*.3)*1.4,0.,1.);vec3 c2=cc*(.6+.5*lf)+sc*k*pow(g,6.)*.5*lf+vec3(.02,.01,.04)*w;c=mix(c,c2,cl*.92);}gl_FragColor=vec4(c,1.);}'});
 const sky=new THREE.Mesh(new THREE.SphereGeometry(900,16,12),skyM);sky.renderOrder=-1;sky.frustumCulled=false;scn.add(sky);
 const disc=new THREE.Mesh(new THREE.SphereGeometry(26,16,12),new THREE.MeshBasicMaterial({fog:false,transparent:true}));scn.add(disc);
 
 /* weather */
 const W={
-sun:{l:'☀️ Sunny',top:C(0x6aa7e0),hor:C(0xf2e9d2),sc:C(0xfff0c8),oc:C(0x1a86bd),sh:C(0x4fe3d6),cl:C(0xffffff),sd:V(.55,.5,-.7),fog:.0025,amb:.7,sun:1,rain:0,A:.3,nt:0,co:.9},
-cloud:{l:'⛅ Cloudy',top:C(0x8399ad),hor:C(0xd3cfc9),sc:C(0xffffff),oc:C(0x3f7f9c),sh:C(0x7bb8b0),cl:C(0xe4e8ec),sd:V(.3,.6,-.7),fog:.003,amb:.8,sun:.45,rain:0,A:.45,nt:0,co:.95},
-rain:{l:'🌧️ Rain',top:C(0x3e4b58),hor:C(0x77838d),sc:C(0xaab4bd),oc:C(0x2c4f63),sh:C(0x5d8c90),cl:C(0x59636d),sd:V(.3,.6,-.7),fog:.0065,amb:.9,sun:.1,rain:1,A:.65,nt:.25,co:1},
-fog:{l:'🌫️ Fog',top:C(0xbfc0c0),hor:C(0xd9d3c9),sc:C(0xffffff),oc:C(0x6a98ac),sh:C(0xa5cbcb),cl:C(0xc8d0d4),sd:V(.3,.6,-.7),fog:.014,amb:.85,sun:.2,rain:0,A:.25,nt:.1,co:.5},
-sunset:{l:'🌅 Sunset',top:C(0x4a3a7e),hor:C(0xffa56e),sc:C(0xffa357),oc:C(0x2a5f9a),sh:C(0x7ad0c4),cl:C(0xffc3a0),sd:V(.6,.028,-.8),fog:.0028,amb:1.0,sun:.9,rain:0,A:.35,nt:.35,co:.85},
-night:{l:'🌙 Night',top:C(0x0a0f2e),hor:C(0x2b3060),sc:C(0xb9ccff),oc:C(0x0f2347),sh:C(0x24607d),cl:C(0x2d3760),sd:V(-.35,.45,-.8),fog:.0035,amb:.6,sun:.4,rain:0,A:.35,nt:1,co:.8}};
-const cur={top:C(0x3f8fdc),hor:C(0xcfe6f3),sc:C(0xfff0c4),oc:C(0x2a95c8),sh:C(0x4fe3d6),cl:C(0xffffff),sd:V(.35,.5,-.8),fog:.008,amb:.7,sun:1,rain:0,A:.3,nt:0,co:.9};
+sun:{l:'☀️ Sunny',top:C(0x6aa7e0),hor:C(0xf2e9d2),sc:C(0xfff0c8),oc:C(0x1a86bd),sh:C(0x4fe3d6),cl:C(0xffffff),sd:V(.55,.5,-.7),fog:.0025,amb:.7,sun:1,rain:0,A:.3,nt:0,co:.9,cv:.38},
+cloud:{l:'⛅ Cloudy',top:C(0x8399ad),hor:C(0xd3cfc9),sc:C(0xffffff),oc:C(0x3f7f9c),sh:C(0x7bb8b0),cl:C(0xe4e8ec),sd:V(.3,.6,-.7),fog:.003,amb:.8,sun:.45,rain:0,A:.45,nt:0,co:.95,cv:.72},
+rain:{l:'🌧️ Rain',top:C(0x3e4b58),hor:C(0x77838d),sc:C(0xaab4bd),oc:C(0x2c4f63),sh:C(0x5d8c90),cl:C(0x59636d),sd:V(.3,.6,-.7),fog:.0065,amb:.9,sun:.1,rain:1,A:.65,nt:.25,co:1,cv:.93},
+fog:{l:'🌫️ Fog',top:C(0xbfc0c0),hor:C(0xd9d3c9),sc:C(0xffffff),oc:C(0x6a98ac),sh:C(0xa5cbcb),cl:C(0xc8d0d4),sd:V(.3,.6,-.7),fog:.014,amb:.85,sun:.2,rain:0,A:.25,nt:.1,co:.5,cv:.66},
+sunset:{l:'🌅 Sunset',top:C(0x4a3a7e),hor:C(0xffa56e),sc:C(0xffa357),oc:C(0x2a5f9a),sh:C(0x7ad0c4),cl:C(0xffc3a0),sd:V(.6,.028,-.8),fog:.0028,amb:1.0,sun:.9,rain:0,A:.35,nt:.35,co:.85,cv:.52},
+night:{l:'🌙 Night',top:C(0x0a0f2e),hor:C(0x2b3060),sc:C(0xb9ccff),oc:C(0x0f2347),sh:C(0x24607d),cl:C(0x2d3760),sd:V(-.35,.45,-.8),fog:.0035,amb:.6,sun:.4,rain:0,A:.35,nt:1,co:.8,cv:.45}};
+const cur={top:C(0x3f8fdc),hor:C(0xcfe6f3),sc:C(0xfff0c4),oc:C(0x2a95c8),sh:C(0x4fe3d6),cl:C(0xffffff),sd:V(.35,.5,-.8),fog:.008,amb:.7,sun:1,rain:0,A:.3,nt:0,co:.9,cv:.38};
 let wk=ld('wx')in W?ld('wx'):'sun';
-function lerpW(dt){const T=W[wk],k=1-Math.exp(-dt*1.3);['top','hor','sc','oc','sh','cl'].forEach(n=>cur[n].lerp(T[n],k));['fog','amb','sun','rain','A','nt','co'].forEach(n=>cur[n]+=(T[n]-cur[n])*k);cur.sd.lerp(T.sd,k)}
+function lerpW(dt){const T=W[wk],k=1-Math.exp(-dt*1.3);['top','hor','sc','oc','sh','cl'].forEach(n=>cur[n].lerp(T[n],k));['fog','amb','sun','rain','A','nt','co','cv'].forEach(n=>cur[n]+=(T[n]-cur[n])*k);cur.sd.lerp(T.sd,k)}
 function setW(k){wk=k;sv('wx',k);[...$('wx').children].forEach(b=>b.dataset.k&&b.classList.toggle('on',b.dataset.k===k))}
 for(const k in W){const b=document.createElement('button');b.textContent=W[k].l;b.dataset.k=k;b.onclick=()=>setW(k);$('wx').appendChild(b)}
 let AW=ld('aw')==='1',wt=40;const aw=document.createElement('button');aw.textContent='🎲 Auto';aw.title='Random weather';aw.classList.toggle('on',AW);aw.onclick=()=>{AW=!AW;sv('aw',AW?1:0);aw.classList.toggle('on',AW)};$('wx').appendChild(aw);
@@ -91,7 +101,7 @@ let AW=ld('aw')==='1',wt=40;const aw=document.createElement('button');aw.textCon
 /* terrain */
 const NX=100,NZ=108,CS=5,ZO=84,XO=60,GR=C(0x808085),GV=C(0x756e60),WH=C(0xf4f8fa),DG=C(0x7f9a4a);
 const tg=new THREE.PlaneGeometry(1,1,NX,NZ);tg.rotateX(-Math.PI/2);tg.setAttribute('color',new THREE.BufferAttribute(new Float32Array((NX+1)*(NZ+1)*3),3));
-const terr=new THREE.Mesh(tg,M(0xffffff,{vertexColors:true}));terr.frustumCulled=false;scn.add(terr);
+const terr=new THREE.Mesh(tg,MD(0xffffff,{vertexColors:true},'g'));terr.frustumCulled=false;terr.receiveShadow=true;scn.add(terr);
 function tint(x,z,h,u,c){const n=vn(x*.07,z*.07);
  if(u>0){const ee=6+OFF(z),cf=CF(z);if(h<-1.5)c.setRGB(.5,.66,.6).multiplyScalar(Math.max(.3,1+(h+1.5)*.14));else if(h<-.3)c.setRGB(.6-.04*n,.52-.04*n,.42);else{c.setRGB(.9-.06*n,.82-.06*n,.62);if(h>.4&&u>7)c.lerp(DG,Math.min(1,.5+n*.7))}if(cf>.35&&u>ee-1&&h>-1.7)c.lerp(GR,sm(.35,.7,cf)*.9)}
  else{const t=sm(10,50,-u);c.setRGB(.3+.1*n-.08*t,.52+.1*n-.12*t,.26);if(h>13)c.lerp(GR,sm(13,19,h))}
@@ -107,22 +117,25 @@ function upTerrain(px,pz){const gx=Math.round(px/10)*10,gz=Math.round(pz/10)*10;
 const OG='float hgt(vec2 p){float t=uT;return (sin(p.x*.105+t*1.1+sin(p.y*.02)*1.5)*.5+sin(dot(p,vec2(.17,.09))+t*1.5)*.3+sin(dot(p,vec2(.38,.17))+t*2.2)*.15+sin(dot(p,vec2(-.21,.33))+t*1.9)*.12)*(1.+.45*sin(p.y*.006+t*.15)*sin(p.x*.004-t*.1));}float OFFf(float z){return (sin(z*.013)*.5+.5)*10.+(sin(z*.031+2.)*.5+.5)*5.;}float CFf(float z){return smoothstep(.5,.8,sin(z*.0047+1.3)*.5+.5);}';
 const TQ=C(0x7fe0d0),og=new THREE.PlaneGeometry(700,700,140,140).rotateX(-Math.PI/2);
 const om=new THREE.ShaderMaterial({transparent:true,fog:true,
-uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{uT:{value:0},uA:{value:.3},uSh:{value:C(0x4ab0c8)},uDp:{value:C(0x145070)},uSky:{value:C(0xcfe6f3)},uTop:{value:C(0x3f8fdc)},uSun:{value:V(0,1,0)},uSC:{value:C(0xffffff)},uL:{value:1}}]),
+uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{uT:{value:0},uA:{value:.3},uSh:{value:C(0x4ab0c8)},uDp:{value:C(0x145070)},uSky:{value:C(0xcfe6f3)},uTop:{value:C(0x3f8fdc)},uSun:{value:V(0,1,0)},uSC:{value:C(0xffffff)},uL:{value:1},uCv:{value:.4},uCc:{value:C(0xffffff)}}]),
 vertexShader:`uniform float uT,uA;varying vec3 vW;
 ${OG}
 #include <fog_pars_vertex>
 void main(){vec4 wp=modelMatrix*vec4(position,1.);float cz=wp.z;float u=wp.x-(sin(cz*.011)*34.+sin(cz*.027+1.)*11.);float e0=6.+OFFf(cz),w0=28.-22.*CFf(cz);float t=smoothstep(e0,e0+w0,u);float th=(.8+sin(cz*.006)*1.6+sin(cz*.017)*.6-.12)*(1.-t)-9.*t;float d=-1.8-th;wp.y+=hgt(wp.xz)*uA*smoothstep(0.,2.5,d)*(1.+.5*smoothstep(25.,120.,u));vW=wp.xyz;vec4 mvPosition=viewMatrix*wp;gl_Position=projectionMatrix*mvPosition;
 #include <fog_vertex>
 }`,
-fragmentShader:`uniform float uT,uA,uL;uniform vec3 uSh,uDp,uSky,uTop,uSun,uSC;varying vec3 vW;
+fragmentShader:`uniform float uT,uA,uL,uCv;uniform vec3 uSh,uDp,uSky,uTop,uSun,uSC,uCc;varying vec3 vW;
 ${OG}
+${CLG}
 #include <fog_pars_fragment>
 void main(){vec2 p=vW.xz;float e=.5,h0=hgt(p);
 vec3 n=normalize(vec3(-(hgt(p+vec2(e,0.))-h0)/e*uA,1.,-(hgt(p+vec2(0.,e))-h0)/e*uA));
-n.xz+=vec2(sin(p.x*1.3+uT*2.)+sin(p.y*1.9-uT*1.6),sin(p.y*1.1+uT*1.9)+sin(p.x*2.1+uT*1.4))*.05*(1.-smoothstep(30.,130.,length(cameraPosition-vW)));n.xz+=vec2(sin(p.x*.35+p.y*.2+uT*.8),cos(p.y*.3-p.x*.15+uT*.7))*.04*(1.-smoothstep(50.,200.,length(cameraPosition-vW)));n=normalize(n);
+float dist=length(cameraPosition-vW);vec2 rp=p*1.4+vec2(uT*.35,uT*.2);float r0=vn2(rp),rx=vn2(rp+vec2(.15,0.))-r0,rz=vn2(rp+vec2(0.,.15))-r0;
+vec2 rp2=p*4.1-vec2(uT*.6,-uT*.4);float s0=vn2(rp2),sx=vn2(rp2+vec2(.12,0.))-s0,sz=vn2(rp2+vec2(0.,.12))-s0;
+n.xz+=(vec2(rx,rz)*.55+vec2(sx,sz)*.4)*(1.-smoothstep(35.,150.,dist));n.xz+=vec2(sin(p.x*.35+p.y*.2+uT*.8),cos(p.y*.3-p.x*.15+uT*.7))*.04*(1.-smoothstep(50.,200.,length(cameraPosition-vW)));n=normalize(n);
 vec3 V=normalize(cameraPosition-vW);vec3 R=reflect(-V,n);R.y=abs(R.y);
 float F=.02+.98*pow(1.-max(dot(n,V),0.),5.);
-vec3 sk=mix(uSky*.8,uTop*1.1,smoothstep(0.,.16,R.y));
+vec3 sk=mix(uSky*.8,uTop*1.1,smoothstep(0.,.16,R.y));float clr=cloudD(R,uT,uCv);sk=mix(sk,uCc*(.55+.45*uL),clr*.8);
 float cz=p.y;float u=p.x-(sin(cz*.011)*34.+sin(cz*.027+1.)*11.);float e0=6.+OFFf(cz),w0=28.-22.*CFf(cz);float t=smoothstep(e0,e0+w0,u);
 float th=(.8+sin(cz*.006)*1.6+sin(cz*.017)*.6-.12)*(1.-t)-9.*t;float d=-1.8-th;
 float dd=max(smoothstep(.2,6.5,d),smoothstep(25.,150.,u));vec3 body=mix(uSh*1.25,uDp,pow(dd,.8))*uL*1.3;
@@ -130,9 +143,9 @@ float pt=sin(p.x*.02+sin(p.y*.015)*2.)*sin(p.y*.025+1.)*.5+.5;body=mix(body,uDp*
 vec2 q=p*.7+vec2(uT*.3,-uT*.2);float cs=pow(1.-abs(sin(q.x*3.+sin(q.y*2.))*sin(q.y*3.+sin(q.x*2.))),6.);
 body+=uSh*cs*.55*(1.-smoothstep(.3,2.8,d))*step(0.,d)*uL*(1.-smoothstep(25.,75.,length(cameraPosition-vW)));float lit=clamp(.5+(dot(n,normalize(uSun+vec3(0.,.5,0.)))-.4)*5.,0.,1.5);body*=.55+.55*lit;body+=uSh*smoothstep(-.2,1.1,h0)*.5*uL;
 vec3 n2=normalize(n+vec3(sin(p.x*3.1+uT*3.)+sin(p.y*2.7-uT*2.3),0.,sin(p.y*3.3+uT*2.7)+sin(p.x*2.9-uT*2.1))*.045*(1.-smoothstep(20.,110.,length(cameraPosition-vW))));vec3 R2=reflect(-V,n2);R2.y=abs(R2.y);float sp=pow(max(dot(R2,uSun),0.),420.)*3.5+pow(max(dot(R,uSun),0.),60.)*.25;
-float fl=1.-smoothstep(0.,.6,d+sin(uT*.7+p.y*.06)*.18);float n1=sin(p.x*2.3+p.y*1.7+uT)*sin(p.y*2.9-p.x*1.3-uT*.7)*.5+.5;
+float fl=1.-smoothstep(0.,.6,d+sin(uT*.7+p.y*.06)*.18);float n1=fb5(p*.9+vec2(uT*.08,-uT*.05))*.65+vn2(p*3.1-uT*.2)*.45;
 float cr=smoothstep(.9,1.4,h0)*smoothstep(.5,1.3,uA)*(.5+.5*n1)*(1.-smoothstep(40.,150.,length(cameraPosition-vW)));
-float bl=(1.-smoothstep(0.,.3,abs(sin((d*1.3-uT*.4)*3.14159))))*(1.-smoothstep(.3,3.5,d))*smoothstep(.2,.8,n1)*step(.05,d);float foam=clamp(fl*(.55+.45*n1)+cr*.7+bl*.8,0.,1.);
+float bl=(1.-smoothstep(0.,.3,abs(sin((d*1.3-uT*.4)*3.14159))))*(1.-smoothstep(.3,3.5,d))*smoothstep(.2,.8,n1)*step(.05,d);float foam=clamp(smoothstep(.25,.7,n1+fl*.6)*fl*1.1+cr*smoothstep(.3,.7,n1)*.8+bl*.8*smoothstep(.3,.7,n1),0.,1.);
 vec3 col=mix(body,sk*uL,F*.24)+uSC*sp;col=mix(col,vec3(.95,.97,1.)*uL,foam);
 float al=mix(.22,.96,smoothstep(0.,3.4,d));al=max(al,foam);al*=1.-smoothstep(310.,345.,max(abs(vW.x-cameraPosition.x),abs(vW.z-cameraPosition.z)));
 gl_FragColor=vec4(col,al);
@@ -142,13 +155,13 @@ float ff=1.-exp(-fogDensity*fogDensity*fogDepth*fogDepth*.22);ff=max(ff,smoothst
 
 }`}),ocean=new THREE.Mesh(og,om);ocean.frustumCulled=false;scn.add(ocean);
 function upOcean(px,pz,t){const ox=Math.round(px/5)*5,oz=Math.round(pz/5)*5,U=om.uniforms;ocean.position.set(ox,-1.8,oz);
- U.uT.value=t;U.uA.value=cur.A*2.2*(1+cur.rain*.3);U.uSh.value.copy(cur.sh);U.uDp.value.copy(cur.oc).multiplyScalar(.7);U.uSky.value.copy(cur.hor);U.uTop.value.copy(cur.top);U.uSun.value.copy(cur.sd).normalize();U.uSC.value.copy(cur.sc).multiplyScalar(Math.min(1,cur.sun*1.2));U.uL.value=Math.max(.25,Math.min(1,cur.amb*.9+cur.sun*.25))}
+ U.uT.value=t;U.uA.value=cur.A*2.2*(1+cur.rain*.3);U.uSh.value.copy(cur.sh);U.uCv.value=cur.cv;U.uCc.value.copy(cur.cl);U.uDp.value.copy(cur.oc).multiplyScalar(.7);U.uSky.value.copy(cur.hor);U.uTop.value.copy(cur.top);U.uSun.value.copy(cur.sd).normalize();U.uSC.value.copy(cur.sc).multiplyScalar(Math.min(1,cur.sun*1.2));U.uL.value=Math.max(.25,Math.min(1,cur.amb*.9+cur.sun*.25))}
  
 
 /* road */
 const RR=240,rpos=new Float32Array(RR*6),rgm=new THREE.BufferGeometry();rgm.setAttribute('position',new THREE.BufferAttribute(rpos,3));
 {const ix=[];for(let i=0;i<RR-1;i++){const a=i*2;ix.push(a,a+1,a+2,a+1,a+3,a+2)}rgm.setIndex(ix)}
-rgm.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(RR*6).map((v,i)=>i%3==1?1:0),3));const road=new THREE.Mesh(rgm,M(0x5a5e68));road.frustumCulled=false;scn.add(road);
+rgm.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(RR*6).map((v,i)=>i%3==1?1:0),3));const road=new THREE.Mesh(rgm,MD(0x5a5e68,{},'r'));road.frustumCulled=false;road.receiveShadow=true;scn.add(road);
 const epos=new Float32Array(RR*12),egm=new THREE.BufferGeometry();egm.setAttribute('position',new THREE.BufferAttribute(epos,3));
 {const ix=[];for(let i=0;i<RR-1;i++){const a=i*4;ix.push(a,a+1,a+4,a+1,a+5,a+4,a+2,a+3,a+6,a+3,a+7,a+6)}egm.setIndex(ix)}
 const po={polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2},edge=new THREE.Mesh(egm,Object.assign(new THREE.MeshBasicMaterial(Object.assign({color:0xe9e9e0},po)),{onBeforeCompile:FF}));edge.frustumCulled=false;scn.add(edge);
@@ -158,20 +171,20 @@ function upRoad(pz){const z0=Math.floor(pz/2)*2+30;for(let i=0;i<RR;i++){const z
  const zb=Math.ceil((pz+20)/5)*5;dashes.forEach((d,i)=>{const z=zb-i*5;d.position.set(CX(z),RZ(z)+.05,z);d.rotation.y=Math.atan(DCX(z))})}
 
 /* trees */
-const MX=760,dm=new THREE.Object3D(),tc=C(0);
+const MX=1000,dm=new THREE.Object3D(),tc=C(0);
 const trunk=new THREE.InstancedMesh(new THREE.CylinderGeometry(.6,.9,1,5).translate(0,.5,0),M(0x6b4a2f),MX),
-ball=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),M(0xffffff),MX),
-cone=new THREE.InstancedMesh(new THREE.ConeGeometry(1,3,6).translate(0,1.5,0),M(0xffffff),MX);
+ball=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),MW(),MX),
+cone=new THREE.InstancedMesh(new THREE.ConeGeometry(1,3,6).translate(0,1.5,0),MW(),MX);
 const rail=new THREE.InstancedMesh(new THREE.BoxGeometry(.06,.07,10.2),M(0xd8dadd),140);
-[trunk,ball,cone,rail].forEach(m=>{m.frustumCulled=false;if(m===ball||m===cone)m.setColorAt(0,tc);m.count=0;scn.add(m)});
+[trunk,ball,cone,rail].forEach(m=>{m.castShadow=true;m.frustumCulled=false;if(m===ball||m===cone)m.setColorAt(0,tc);m.count=0;scn.add(m)});
 const put=(m,n,x,y,z,sx,sy,sz,c)=>{dm.position.set(x,y,z);dm.scale.set(sx,sy,sz);dm.updateMatrix();m.setMatrixAt(n,dm.matrix);if(c)m.setColorAt(n,c)};
 let tkc=1e9;
 function upTrees(pz){const kc=Math.floor(pz/10);if(kc===tkc)return;tkc=kc;let a=0,b=0,c2=0;
  for(let k=kc-44;k<=kc+4;k++)for(let i=0;i<7;i++){const r1=hs(k,i),r2=hs(i+.5,k),r3=hs(k+.3,i+.7),r4=hs(k*1.7,i*2.3),z=k*10+r1*10;let u,t;
   if(i<5){u=-(9+r2*r2*75);t=r3<.45?0:1}else{if(r3<.5)continue;u=7+r2*9;t=2}
   const x=CX(z)+u,y=H(x,z),s=.8+r4*.9;if(y>15||(t==2&&y<-1))continue;
-  if(t==0){put(trunk,a++,x,y,z,.35*s,2.4*s,.35*s);put(ball,b++,x,y+2.6*s,z,1.5*s,1.3*s,1.5*s,tc.setRGB(.2+r2*.15,.45+r4*.15,.2))}
-  else if(t==1){put(trunk,a++,x,y,z,.3*s,1.2*s,.3*s);put(cone,c2++,x,y+s,z,1.4*s,2.2*s,1.4*s,tc.setRGB(.1,.3+r2*.1,.2))}
+  if(t==0){put(trunk,a++,x,y,z,.35*s,2.4*s,.35*s);const gr=.2+r2*.15,gg=.45+r4*.15;put(ball,b++,x,y+2.6*s,z,1.5*s,1.3*s,1.5*s,tc.setRGB(gr,gg,.2));put(ball,b++,x+(r1-.5)*1.8*s,y+3.4*s,z+(r2-.5)*1.8*s,1.1*s,1.0*s,1.1*s,tc.setRGB(gr*1.15,gg*1.12,.22));put(ball,b++,x-(r3-.5)*1.6*s,y+2.2*s,z+(r4-.5)*1.6*s,1.0*s,.9*s,1.0*s,tc.setRGB(gr*.8,gg*.85,.17))}
+  else if(t==1){put(trunk,a++,x,y,z,.3*s,1.2*s,.3*s);const cg=.26+r2*.08;put(cone,c2++,x,y+s,z,1.5*s,1.5*s,1.5*s,tc.setRGB(.07,cg,.15));put(cone,c2++,x,y+3.2*s,z,1.15*s,1.4*s,1.15*s,tc.setRGB(.09,cg+.05,.17));put(cone,c2++,x,y+5.3*s,z,.8*s,1.1*s,.8*s,tc.setRGB(.12,cg+.1,.19))}
   else{put(trunk,a++,x,y,z,.16*s,3.6*s,.16*s);put(ball,b++,x,y+3.6*s,z,1.7*s,.32*s,1.7*s,tc.setRGB(.28,.5,.25))}}
  let rc=0;for(let k=kc-44;k<=kc+4;k++){const z=k*10,cx=CX(z),ry=RZ(z),q1=hs(k,9.1),q2=hs(k,3.3),q3=hs(k,7.7);
   dm.rotation.set(0,Math.atan(DCX(z)),0);put(rail,rc++,cx+4.9,ry+.65,z,1,1,1);dm.rotation.set(0,0,0);put(trunk,a++,cx+4.9,ry,z,.1,.9,.1);
@@ -190,7 +203,7 @@ function upTrees(pz){const kc=Math.floor(pz/10);if(kc===tkc)return;tkc=kc;let a=
 /* clouds + rain */
 const cm=new THREE.MeshBasicMaterial({fog:false,transparent:true}),cg=new THREE.IcosahedronGeometry(1,1),clouds=[];
 for(let i=0;i<16;i++){const g=new THREE.Group();for(let j=0;j<5;j++){const m=new THREE.Mesh(cg,cm);m.position.set((j-2)*10+Math.random()*6,Math.random()*3,Math.random()*8);m.scale.set(9+Math.random()*7,4+Math.random()*3,7+Math.random()*4);g.add(m)}
- g.position.set(Math.random()*600-300,70+Math.random()*40,-Math.random()*520+60);scn.add(g);clouds.push(g)}
+ g.position.set(Math.random()*600-300,70+Math.random()*40,-Math.random()*520+60);clouds.push(g)}
 const hullGeo=(L,Wd,Hh,bw)=>{const s=new THREE.Shape();s.moveTo(-Wd/2,-L/2);s.lineTo(Wd/2,-L/2);s.lineTo(Wd/2,L/2-bw);s.lineTo(0,L/2);s.lineTo(-Wd/2,L/2-bw);s.closePath();return new THREE.ExtrudeGeometry(s,{depth:Hh,bevelEnabled:false}).rotateX(-Math.PI/2)};
 const winM=new THREE.MeshBasicMaterial({color:0x1a2230}),WD=C(0x1a2230),WL=C(0xffd98a),ships=[],cb=new THREE.BoxGeometry(3.6,2.5,5);
 const mesh=(g,ge,mt,x,y,z)=>{const o=new THREE.Mesh(ge,mt);o.position.set(x,y,z);g.add(o);return o},box=(g,w,h,d,mt,x,y,z)=>mesh(g,new THREE.BoxGeometry(w,h,d),mt,x,y,z);
@@ -298,7 +311,7 @@ function build(b){const g=new THREE.Group(),f=M(b.c),k=M(0x23242a),m=M(0xb9bec6)
  const bl=new THREE.Mesh(new THREE.CircleGeometry(1,16).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:.28}));bl.position.y=.02;bl.scale.set(.45,1,wb*.6);g.add(bl);return g}
 const bike=new THREE.Group();bike.rotation.order='YXZ';lamp.position.set(0,1.1,-1.6);bike.add(lamp);scn.add(bike);
 const models=[];let mdl=null,bi=+ld('bike')||0;if(bi<0||bi>3)bi=0;
-function pick(i){bi=i;sv('bike',i);if(mdl)bike.remove(mdl);mdl=models[i]=models[i]||build(BIKES[i]);bike.add(mdl);$('bk').textContent=BIKES[i].e+' '+BIKES[i].n;[...$('bikes').children].forEach((b,j)=>b.classList.toggle('on',j==i))}
+function pick(i){bi=i;sv('bike',i);if(mdl)bike.remove(mdl);mdl=models[i]=models[i]||build(BIKES[i]);mdl.traverse(o=>{if(o.isMesh)o.castShadow=true});bike.add(mdl);$('bk').textContent=BIKES[i].e+' '+BIKES[i].n;[...$('bikes').children].forEach((b,j)=>b.classList.toggle('on',j==i))}
 BIKES.forEach((b,i)=>{const e=document.createElement('button');e.innerHTML='<b>'+b.e+'</b>'+b.n;e.onclick=()=>pick(i);$('bikes').appendChild(e)});
 $('bk').onclick=()=>pick((bi+1)%BIKES.length);
 
@@ -329,28 +342,28 @@ addEventListener('keyup',e=>K[e.code]=0);
 ren.domElement.addEventListener('pointerdown',()=>drag=true);addEventListener('pointerup',()=>drag=false);
 addEventListener('pointermove',e=>{if(drag)orbit-=e.movementX*.006});
 $('tg').onclick=()=>$('panel').classList.toggle('hid');
-$('go').onclick=()=>{initAudio();radio($('rl0').value);$('start').classList.add('hid');['panel','sp','tg'].forEach(i=>$(i).classList.remove('hid'));setAP(AA)};
+$('go').onclick=()=>{initAudio();radio($('rl0').value);$('start').classList.add('hid');['panel','sp','tg'].forEach(i=>$(i).classList.remove('hid'));setAP(AA);if(!AA)v=0};
 
 /* game loop */
 let ch=0,z=0,u=-1.4,v=7,steer=0,T=0,first=1,last=performance.now();
 const fw=V(0,0,0);
 function step(dt){const b=BIKES[bi],up=K.KeyW||K.ArrowUp,dn=K.KeyS||K.ArrowDown||K.Space,l=K.KeyA||K.ArrowLeft,r=K.KeyD||K.ArrowRight;
  const inp=up||dn||l||r;if(AP&&inp)setAP(false);idle=(inp||AP)?0:idle+dt;if(AA&&!AP&&idle>10)setAP(true);
- const tv=b.v*(AP?1:1+.7*(up?1:0)-.85*(dn?1:0));v+=(tv-v)*Math.min(1,dt*1.2);
+ if(AP)v+=(b.v-v)*Math.min(1,dt*1.2);else if(dn)v=Math.max(0,v-b.v*1.2*dt);else if(up)v=Math.min(b.v*1.6,v+b.v*.4*dt);else v=Math.max(0,v-b.v*.15*dt);
  const ts=AP?Math.max(-1,Math.min(1,(-1.5+Math.sin(T*.2)*1.3-u)*.9)):(r?1:0)-(l?1:0);steer+=(ts-steer)*Math.min(1,dt*4);
- const du=steer*3.4*(.35+.65*Math.min(1,v/b.v));u=Math.max(-3.4,Math.min(3.4,u+du*dt));z-=v*dt;
- const x=CX(z)+u,y=RZ(z),th=Math.atan2(DCX(z)*v-du,v);
+ const du=steer*3.4*Math.min(1,v/(b.v*.5));u=Math.max(-3.4,Math.min(3.4,u+du*dt));z-=v*dt;
+ const x=CX(z)+u,y=RZ(z),ve=Math.max(v,.5),th=Math.atan2(DCX(z)*ve-du,ve);
  bike.position.set(x,y,z);bike.rotation.set(Math.atan(-DRZ(z)),th,-steer*.3);
  const w=mdl.userData.w;w[0].rotation.x=w[1].rotation.x-=v*dt/w[2];
  if(!drag&&RC)orbit*=1-Math.min(1,dt*.5);
  let dd=th-ch;dd=Math.atan2(Math.sin(dd),Math.cos(dd));ch=first?th:ch+dd*Math.min(1,dt*5);const a=ch+(AP&&RC?Math.sin(T*.05)*1.2:0)+orbit,D=b.t=='b'?3:3.5,tx=x+Math.sin(a)*D,tz=z+Math.cos(a)*D,ty=Math.max(y+1.5,H(tx,tz)+1),k=first?1:Math.min(1,dt*8);first=0;
  cam.position.set(tx,cam.position.y+(ty-cam.position.y)*k,tz);
  fw.set(-Math.sin(th),0,-Math.cos(th));cam.lookAt(x+fw.x*2,y+.95,z+fw.z*2);cam.fov=58+v*.5;cam.updateProjectionMatrix();
- $('sp').textContent=Math.round(v*3.6)+' km/h';return[x,y,z]}
+ $('sp').textContent=Math.round(v*3.6)+' km/h'+(!AP&&v<.3?'  ·  hold W / ▲ to ride':'');return[x,y,z]}
 function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;T+=dt;lerpW(dt);if(AW&&(wt-=dt)<0){wt=45+Math.random()*60;const ks=Object.keys(W).filter(x=>x!==wk);setW(ks[Math.floor(Math.random()*ks.length)])}
  const[x,y,pz]=step(dt);
- scn.fog.color.copy(cur.hor);scn.fog.density=cur.fog;skyM.uniforms.t.value.copy(cur.top);skyM.uniforms.h.value.copy(cur.hor);skyM.uniforms.sc.value.copy(cur.sc);skyM.uniforms.sd.value.copy(cur.sd).normalize();skyM.uniforms.k.value=Math.min(1,cur.sun);skyM.uniforms.w.value=1-sm(.05,.4,cur.sd.y/cur.sd.length());
- hemi.color.copy(cur.hor).lerp(WH,.35);hemi.groundColor.copy(cur.hor).multiplyScalar(.5);hemi.intensity=cur.amb;fill.color.copy(cur.hor).lerp(WH,.4);fill.intensity=.2+.22*(1-cur.nt);sunL.color.copy(cur.sc);sunL.intensity=cur.sun;sunL.position.set(x+cur.sd.x*100,y+cur.sd.y*100,pz+cur.sd.z*100);sunL.target.position.set(x,y,pz);
+ scn.fog.color.copy(cur.hor);scn.fog.density=cur.fog;skyM.uniforms.t.value.copy(cur.top);skyM.uniforms.h.value.copy(cur.hor);skyM.uniforms.sc.value.copy(cur.sc);skyM.uniforms.sd.value.copy(cur.sd).normalize();skyM.uniforms.k.value=Math.min(1,cur.sun);skyM.uniforms.cc.value.copy(cur.cl);skyM.uniforms.cv.value=cur.cv;skyM.uniforms.tt.value=T;skyM.uniforms.w.value=1-sm(.05,.4,cur.sd.y/cur.sd.length());
+ hemi.color.copy(cur.hor).lerp(WH,.35);hemi.groundColor.copy(cur.hor).multiplyScalar(.5);hemi.intensity=cur.amb;fill.color.copy(cur.hor).lerp(WH,.4);fill.intensity=.2+.22*(1-cur.nt);sunL.color.copy(cur.sc);sunL.intensity=cur.sun;sunL.position.set(x+cur.sd.x*100,y+cur.sd.y*100,pz+cur.sd.z*100);sunL.target.position.set(x,y,pz);{const sv2=cur.sd.clone().normalize();sv2.y=Math.max(sv2.y,.32);sv2.normalize();const gx=Math.round(x),gz=Math.round(pz);shL.position.set(gx+sv2.x*160,y+sv2.y*160,gz+sv2.z*160);shL.target.position.set(gx,y,gz);shL.color.copy(cur.sc)}WT.value=T;
  lamp.intensity=cur.nt*1.8;cm.color.copy(cur.cl);cm.opacity=cur.co;
  sky.position.copy(cam.position);disc.position.copy(cam.position).addScaledVector(cur.sd.clone().normalize(),800);disc.material.color.copy(cur.sc);disc.scale.setScalar(1+1.1*sm(.35,.08,cur.sd.y/cur.sd.length()));disc.material.opacity=Math.max(0,Math.min(1,(cur.sun-.2)/.5));
  if(rainG)rainG.gain.value=cur.rain*.35;
@@ -358,4 +371,3 @@ function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;T+=dt;lerpW(d
  ren.render(scn,cam);requestAnimationFrame(loop)}
 pick(bi);setW(wk);setAP(true);$('cr').classList.toggle('on',RC);$('aa').classList.toggle('on',AA);requestAnimationFrame(loop);
 </script></body></html>
-
